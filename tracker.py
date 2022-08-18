@@ -36,9 +36,11 @@ def get_downloads_html(url: str) -> list:
     :param url: realme downloads page
     :return: list of devices latest downloads HTML
     """
-    downloads_html = BeautifulSoup(get(url).text, "html.parser") \
-        .select_one("div.software-items").select("div.software-item")
-    return downloads_html
+    return (
+        BeautifulSoup(get(url).text, "html.parser")
+        .select_one("div.software-items")
+        .select("div.software-item")
+    )
 
 
 def parse_html(html: list) -> list:
@@ -127,7 +129,7 @@ def merge_yaml():
             for update in updates:
                 if update["md5"] not in str(yaml_data):
                     yaml_data.append(update)
-    with open(f'latest.yml', "w") as output:
+    with open('latest.yml', "w") as output:
         yaml.dump(yaml_data, output, allow_unicode=True)
 
 
@@ -135,8 +137,12 @@ def merge_archive():
     """
     merge all archive yaml files into one file
     """
-    yaml_files = [x for x in sorted(glob(f'archive/*.yml'))
-                  if not x.endswith('archive.yml')]
+    yaml_files = [
+        x
+        for x in sorted(glob('archive/*.yml'))
+        if not x.endswith('archive.yml')
+    ]
+
     yaml_data = []
     for file in yaml_files:
         with open(file, "r") as yaml_file:
@@ -160,14 +166,17 @@ def diff_yaml(filename: str) -> list:
     except FileNotFoundError:
         print(f"Can't find old {filename} files, skipping")
         first_run = True
-    if first_run is False:
+    if not first_run:
         if len(latest) == len(old):
-            return [new_ for new_, old_ in zip(latest, old)
-                    if not new_['version'] == old_['version']]
+            return [
+                new_
+                for new_, old_ in zip(latest, old)
+                if new_['version'] != old_['version']
+            ]
+
         old_codenames = [i["codename"] for i in old]
         new_codenames = [i["codename"] for i in latest]
-        changes = [i for i in new_codenames if i not in old_codenames]
-        if changes:
+        if changes := [i for i in new_codenames if i not in old_codenames]:
             return [i for i in latest for codename in changes
                     if codename == i["codename"]]
 
@@ -211,7 +220,7 @@ def tg_post(message: str) -> int:
         ('parse_mode', "Markdown"),
         ('disable_web_page_preview', "yes")
     )
-    telegram_url = "https://api.telegram.org/bot" + BOT_TOKEN + "/sendMessage"
+    telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     telegram_req = post(telegram_url, params=params)
     telegram_status = telegram_req.status_code
     if telegram_status == 200:
@@ -222,7 +231,7 @@ def tg_post(message: str) -> int:
         print("Wrong / Unauthorized token")
     else:
         print("Unknown error")
-        print("Response: " + telegram_req.reason)
+        print(f"Response: {telegram_req.reason}")
     return telegram_status
 
 
@@ -248,7 +257,7 @@ def git_commit_push():
     """
     git add - git commit - git push
     """
-    today = str(datetime.today()).split('.')[0]
+    today = str(datetime.now()).split('.')[0]
     system("git add *.yml */*.yml && git -c \"user.name=RealmeCI\" -c "
            "\"user.email=RealmeCI@example.com\" "
            "commit -m \"sync: {}\" && "" \
@@ -270,8 +279,7 @@ def main():
     merge_yaml()
     for url in URLS:
         region = set_region(url)
-        changes = diff_yaml(region)
-        if changes:
+        if changes := diff_yaml(region):
             for update in changes:
                 if not update["version"]:
                     continue
